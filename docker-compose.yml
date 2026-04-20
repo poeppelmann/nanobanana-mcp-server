@@ -1,0 +1,31 @@
+# Local smoke test of the MCP server over HTTP (more practical in Docker than stdio).
+#
+# Prerequisite: `.env` with a valid GEMINI_API_KEY (see `.env.example`).
+#
+# Start:  docker compose up --build
+# Logs:  docker compose logs -f
+# Stop:  docker compose down
+#
+# Server: http://127.0.0.1:9000 (adjust host port via HOST_MCP_PORT; container listens on 9000)
+
+services:
+  nanobanana-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      FASTMCP_TRANSPORT: http
+      FASTMCP_HOST: 0.0.0.0
+      FASTMCP_PORT: "9000"
+      IMAGE_OUTPUT_DIR: /app/data/images
+    ports:
+      # Host port → container 9000 (in-container port is fixed; see FASTMCP_PORT above)
+      - "${HOST_MCP_PORT:-9000}:9000"
+    volumes:
+      - nanobanana-images:/app/data/images
+    restart: unless-stopped
+
+volumes:
+  nanobanana-images:
