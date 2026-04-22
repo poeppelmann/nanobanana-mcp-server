@@ -45,6 +45,6 @@ USER app
 EXPOSE 9000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
-    CMD python -c "import os,socket; p=int(os.environ.get('FASTMCP_PORT','9000')); s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',p)); s.close()"
+    CMD python -c "import os,urllib.request; p=os.environ.get('FASTMCP_PORT','9000'); urllib.request.urlopen(f'http://127.0.0.1:{p}/healthz', timeout=2)"
 
 CMD ["nanobanana-mcp-server"]

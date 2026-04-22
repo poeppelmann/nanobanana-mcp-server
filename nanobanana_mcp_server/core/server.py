@@ -1,5 +1,7 @@
-from fastmcp import FastMCP
 import logging
+
+from fastmcp import FastMCP
+
 from ..config.settings import ServerConfig
 
 
@@ -21,6 +23,7 @@ class NanoBananaMCP:
         self._register_tools()
         self._register_resources()
         self._register_prompts()
+        self._register_health_routes()
 
     def _get_server_instructions(self) -> str:
         """Get server description and instructions."""
@@ -37,9 +40,9 @@ class NanoBananaMCP:
     def _register_tools(self):
         """Register all tools with the server."""
         from ..tools.generate_image import register_generate_image_tool
-        from ..tools.upload_file import register_upload_file_tool
-        from ..tools.output_stats import register_output_stats_tool
         from ..tools.maintenance import register_maintenance_tool
+        from ..tools.output_stats import register_output_stats_tool
+        from ..tools.upload_file import register_upload_file_tool
 
         register_generate_image_tool(self.server)
         register_upload_file_tool(self.server)
@@ -49,8 +52,8 @@ class NanoBananaMCP:
     def _register_resources(self):
         """Register all resources with the server."""
         from ..resources.file_metadata import register_file_metadata_resource
-        from ..resources.template_catalog import register_template_catalog_resource
         from ..resources.operation_status import register_operation_status_resources
+        from ..resources.template_catalog import register_template_catalog_resource
 
         register_file_metadata_resource(self.server)
         register_template_catalog_resource(self.server)
@@ -58,13 +61,18 @@ class NanoBananaMCP:
 
     def _register_prompts(self):
         """Register all prompts with the server."""
-        from ..prompts.photography import register_photography_prompts
         from ..prompts.design import register_design_prompts
         from ..prompts.editing import register_editing_prompts
+        from ..prompts.photography import register_photography_prompts
 
         register_photography_prompts(self.server)
         register_design_prompts(self.server)
         register_editing_prompts(self.server)
+
+    def _register_health_routes(self) -> None:
+        from .health_routes import register_health_routes
+
+        register_health_routes(self.server)
 
     def run(self):
         """Start the server."""
