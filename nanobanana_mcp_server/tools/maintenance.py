@@ -8,14 +8,17 @@ Provides tools for:
 - Database hygiene and consistency checks
 """
 
-from typing import Annotated, Optional
-from pydantic import Field
-from fastmcp import FastMCP, Context
+import logging
+from typing import Annotated
+
+from fastmcp import Context, FastMCP
 from fastmcp.tools.tool import ToolResult
 from mcp.types import TextContent
+from pydantic import Field
+
 from ..core.exceptions import ValidationError
 from ..utils.concurrency_limit import limit_tool_concurrency
-import logging
+from ..utils.logging_utils import sanitize_error_message
 
 
 def register_maintenance_tool(server: FastMCP):
@@ -42,7 +45,7 @@ def register_maintenance_tool(server: FastMCP):
             Field(description="If true, only report what would be done without making changes"),
         ] = True,
         max_age_hours: Annotated[
-            Optional[int],
+            int | None,
             Field(
                 description="For local cleanup: maximum age in hours (default: 168 = 1 week)",
                 ge=1,
@@ -50,7 +53,7 @@ def register_maintenance_tool(server: FastMCP):
             ),
         ] = None,
         keep_count: Annotated[
-            Optional[int],
+            int | None,
             Field(
                 description="For local cleanup: minimum number of recent files to keep",
                 ge=1,
@@ -137,10 +140,10 @@ def register_maintenance_tool(server: FastMCP):
             return ToolResult(content=content, structured_content=structured_content)
 
         except ValidationError as e:
-            logger.error(f"Validation error in maintenance: {e}")
+            logger.error("Validation error in maintenance: %s", sanitize_error_message(str(e)))
             raise
         except Exception as e:
-            logger.error(f"Unexpected error in maintenance: {e}")
+            logger.error("Unexpected error in maintenance: %s", sanitize_error_message(str(e)))
             raise
 
 

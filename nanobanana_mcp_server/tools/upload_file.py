@@ -1,12 +1,15 @@
+import logging
 import os
-from typing import Annotated, Optional
-from pydantic import Field
-from fastmcp import FastMCP, Context
+from typing import Annotated
+
+from fastmcp import Context, FastMCP
 from fastmcp.tools.tool import ToolResult
-from ..core.exceptions import ValidationError, FileOperationError
+from pydantic import Field
+
+from ..core.exceptions import FileOperationError, ValidationError
 from ..utils.client_errors import client_safe_message
 from ..utils.concurrency_limit import limit_tool_concurrency
-import logging
+from ..utils.logging_utils import sanitize_error_message
 
 
 def register_upload_file_tool(server: FastMCP):
@@ -30,7 +33,7 @@ def register_upload_file_tool(server: FastMCP):
             ),
         ],
         display_name: Annotated[
-            Optional[str],
+            str | None,
             Field(description="Optional display name for the uploaded file.", max_length=256),
         ] = None,
         ctx: Context = None,
@@ -65,20 +68,21 @@ def register_upload_file_tool(server: FastMCP):
             )
 
         except ValidationError as e:
-            logger.error(f"Validation error in upload_file: {e}")
+            detail = sanitize_error_message(str(e))
+            logger.error("Validation error in upload_file: %s", detail)
             return ToolResult(
-                content=[f"Validation error: {e}"],
-                structured_content={"error": "validation_error", "message": str(e)},
+                content=[f"Validation error: {detail}"],
+                structured_content={"error": "validation_error", "message": detail},
             )
         except FileOperationError as e:
-            logger.error(f"File operation error in upload_file: {e}")
-            safe = client_safe_message(str(e))
+            logger.error("File operation error in upload_file: %s", sanitize_error_message(str(e)))
+            safe = client_safe_message(sanitize_error_message(str(e)))
             return ToolResult(
                 content=[f"File upload failed: {safe}"],
                 structured_content={"error": "file_operation_error", "message": safe},
             )
         except Exception as e:
-            logger.error(f"Unexpected error in upload_file: {e}")
+            logger.error("Unexpected error in upload_file: %s", sanitize_error_message(str(e)))
             raise
 
 

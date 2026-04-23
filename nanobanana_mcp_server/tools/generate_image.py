@@ -14,6 +14,7 @@ from ..config.settings import ModelTier, ThinkingLevel
 from ..core.exceptions import ValidationError
 from ..core.validation import validate_edit_instruction, validate_prompt
 from ..utils.concurrency_limit import limit_tool_concurrency
+from ..utils.logging_utils import sanitize_error_message
 from ..utils.validation_utils import validate_input_image_path, validate_output_path
 
 
@@ -107,9 +108,22 @@ def register_generate_image_tool(server: FastMCP):
         ] = True,
         aspect_ratio: Annotated[
             Literal[
-                "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9",
-                "4:1", "1:4", "8:1", "1:8",
-            ] | None,
+                "1:1",
+                "2:3",
+                "3:2",
+                "3:4",
+                "4:3",
+                "4:5",
+                "5:4",
+                "9:16",
+                "16:9",
+                "21:9",
+                "4:1",
+                "1:4",
+                "8:1",
+                "1:8",
+            ]
+            | None,
             Field(
                 description="Optional output aspect ratio (e.g., '16:9'). "
                 "Standard: 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9. "
@@ -426,10 +440,9 @@ def register_generate_image_tool(server: FastMCP):
                 try:
                     effective_return_full_image = server_cfg.return_full_image
                 except RuntimeError:
-                    effective_return_full_image = (
-                        os.getenv("RETURN_FULL_IMAGE", "false").strip().lower()
-                        in ("true", "1", "yes")
-                    )
+                    effective_return_full_image = os.getenv(
+                        "RETURN_FULL_IMAGE", "false"
+                    ).strip().lower() in ("true", "1", "yes")
 
             # Create response with file paths and thumbnails
             if metadata:
@@ -577,7 +590,9 @@ def register_generate_image_tool(server: FastMCP):
                 "auto_selected": tier == ModelTier.AUTO,
                 "thinking_level": thinking_level if selected_tier == ModelTier.NB2 else None,
                 "resolution": resolution,
-                "grounding_enabled": enable_grounding if selected_tier in (ModelTier.PRO, ModelTier.NB2) else False,
+                "grounding_enabled": enable_grounding
+                if selected_tier in (ModelTier.PRO, ModelTier.NB2)
+                else False,
                 "requested": n,
                 "returned": len(thumbnail_images),
                 "negative_prompt_applied": bool(negative_prompt),
@@ -631,10 +646,10 @@ def register_generate_image_tool(server: FastMCP):
             return ToolResult(content=content, structured_content=structured_content)
 
         except ValidationError as e:
-            logger.error(f"Validation error in generate_image: {e}")
+            logger.error("Validation error in generate_image: %s", sanitize_error_message(str(e)))
             raise
         except Exception as e:
-            logger.error(f"Unexpected error in generate_image: {e}")
+            logger.error("Unexpected error in generate_image: %s", sanitize_error_message(str(e)))
             raise
 
 

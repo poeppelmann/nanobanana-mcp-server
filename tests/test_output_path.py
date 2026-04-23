@@ -125,7 +125,10 @@ class TestResolveOutputPath:
 
     def test_home_directory_expansion(self):
         """Paths with ~ are expanded (use isolated HOME so tests do not touch the real home)."""
-        with TemporaryDirectory() as fake_home, patch.dict(os.environ, {"HOME": fake_home}, clear=False):
+        with (
+            TemporaryDirectory() as fake_home,
+            patch.dict(os.environ, {"HOME": fake_home}, clear=False),
+        ):
             result = resolve_output_path("~/images/photo.png", "/default", "gen.png")
             assert "~" not in result
             assert os.path.isabs(result)

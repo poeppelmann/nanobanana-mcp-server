@@ -69,7 +69,9 @@ def _raise_if_symlink_escapes_base(user_path: str, base_real: str) -> None:
         step = os.path.join(current, part)
         if os.path.islink(step):
             target = os.readlink(step)
-            tgt = os.path.join(os.path.dirname(step), target) if not os.path.isabs(target) else target
+            tgt = (
+                os.path.join(os.path.dirname(step), target) if not os.path.isabs(target) else target
+            )
             tgt_real = os.path.realpath(tgt)
             if not _path_is_under_base(tgt_real, base_real):
                 raise ValidationError(

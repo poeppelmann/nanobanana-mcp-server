@@ -2,13 +2,16 @@
 Tool for getting output directory statistics.
 """
 
-from fastmcp import FastMCP, Context
+import logging
+
+from fastmcp import Context, FastMCP
 from fastmcp.tools.tool import ToolResult
 from mcp.types import TextContent
+
 from ..services import get_file_image_service
 from ..utils.client_errors import client_safe_message
 from ..utils.concurrency_limit import limit_tool_concurrency
-import logging
+from ..utils.logging_utils import sanitize_error_message
 
 
 def register_output_stats_tool(server: FastMCP):
@@ -37,12 +40,10 @@ def register_output_stats_tool(server: FastMCP):
             stats = file_service.get_output_stats()
 
             if "error" in stats:
-                safe_err = client_safe_message(str(stats["error"]))
+                safe_err = client_safe_message(sanitize_error_message(str(stats["error"])))
                 return ToolResult(
                     content=[
-                        TextContent(
-                            type="text", text=f"Error getting output stats: {safe_err}"
-                        )
+                        TextContent(type="text", text=f"Error getting output stats: {safe_err}")
                     ],
                     structured_content={**stats, "error": safe_err},
                 )
@@ -69,5 +70,5 @@ def register_output_stats_tool(server: FastMCP):
             )
 
         except Exception as e:
-            logger.error(f"Failed to get output stats: {e}")
+            logger.error("Failed to get output stats: %s", sanitize_error_message(str(e)))
             raise

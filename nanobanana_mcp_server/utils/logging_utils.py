@@ -1,8 +1,65 @@
-import logging
-import sys
-from typing import Optional
+from datetime import UTC, datetime
 import json
-from datetime import datetime
+import logging
+import re
+import sys
+
+# Common base64 alphabet (RFC 4648) — long runs often appear in leaked creds or tokens
+_LONG_B64ISH = re.compile(r"[A-Za-z0-9+/=]{220,}")
+_PEM_BLOCK = re.compile(
+    r"-----BEGIN [^-]+-----\r?\n?.*?-----END [^-]+-----",
+    re.DOTALL | re.IGNORECASE,
+)
+_GCP_SA_JSON_START = re.compile(r'\{\s*"type"\s*:\s*"service_account"')
+_PRIVATE_KEY_JSON = re.compile(
+    r'"private_key"\s*:\s*"((?:[^"\\]|\\.)*)"',
+    re.DOTALL,
+)
+
+
+def sanitize_error_message(msg: str) -> str:
+    """Redact secrets from arbitrary log or error strings (PEM, SA JSON, long tokens)."""
+    if not msg or not isinstance(msg, str):
+        return msg
+
+    s = _PEM_BLOCK.sub("[REDACTED: PEM block]", msg)
+    s = _PRIVATE_KEY_JSON.sub('"private_key": "[REDACTED]"', s)
+    s = _redact_service_account_json_object(s)
+    s = _LONG_B64ISH.sub("[REDACTED: long token]", s)
+    return s
+
+
+def _redact_service_account_json_object(s: str) -> str:
+    """Replace a top-level GCP service account JSON object with a placeholder."""
+    for m in _GCP_SA_JSON_START.finditer(s):
+        start = m.start()
+        depth = 0
+        for j in range(start, len(s)):
+            c = s[j]
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    return s[:start] + "[REDACTED: GCP service account JSON]" + s[j + 1 :]
+            if j - start > 500_000:
+                break
+    return s
+
+
+class SecretSanitizingFilter(logging.Filter):
+    """Apply sanitize_error_message to every log line (message and lazy args)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            full = record.getMessage()
+        except Exception:
+            return True
+        safe = sanitize_error_message(full)
+        if safe != full:
+            record.msg = safe
+            record.args = ()
+        return True
 
 
 def setup_logging(level: str = "INFO", format_type: str = "standard") -> None:
@@ -38,6 +95,7 @@ def setup_logging(level: str = "INFO", format_type: str = "standard") -> None:
     # Add console handler - use stderr for MCP STDIO compatibility
     console_handler = logging.StreamHandler(sys.stderr)
     console_handler.setFormatter(formatter)
+    console_handler.addFilter(SecretSanitizingFilter())
     root_logger.addHandler(console_handler)
 
     # Set specific loggers to appropriate levels
@@ -54,10 +112,10 @@ class JSONFormatter(logging.Formatter):
         """Format log record as JSON."""
 
         log_entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
+            "message": sanitize_error_message(record.getMessage()),
             "module": record.module,
             "function": record.funcName,
             "line": record.lineno,
@@ -65,10 +123,12 @@ class JSONFormatter(logging.Formatter):
 
         # Add exception info if present
         if record.exc_info:
-            log_entry["exception"] = self.formatException(record.exc_info)
+            log_entry["exception"] = sanitize_error_message(self.formatException(record.exc_info))
 
         # Add any extra fields
         for key, value in record.__dict__.items():
+            if key in ("msg", "message") and isinstance(value, str):
+                value = sanitize_error_message(value)
             if key not in (
                 "name",
                 "msg",
@@ -103,7 +163,7 @@ def get_logger(name: str) -> logging.Logger:
 
 
 def log_function_call(
-    logger: logging.Logger, func_name: str, args: Optional[dict] = None, level: str = "DEBUG"
+    logger: logging.Logger, func_name: str, args: dict | None = None, level: str = "DEBUG"
 ) -> None:
     """Log a function call with arguments."""
     numeric_level = getattr(logging, level.upper(), logging.DEBUG)
@@ -117,7 +177,7 @@ def log_function_call(
 
 
 def log_function_result(
-    logger: logging.Logger, func_name: str, result: Optional[dict] = None, level: str = "DEBUG"
+    logger: logging.Logger, func_name: str, result: dict | None = None, level: str = "DEBUG"
 ) -> None:
     """Log a function result."""
     numeric_level = getattr(logging, level.upper(), logging.DEBUG)
@@ -158,7 +218,7 @@ def sanitize_log_data(data: dict) -> dict:
 
 
 def log_performance_metric(
-    logger: logging.Logger, operation: str, duration_ms: float, metadata: Optional[dict] = None
+    logger: logging.Logger, operation: str, duration_ms: float, metadata: dict | None = None
 ) -> None:
     """Log performance metrics."""
     perf_data = {
@@ -178,8 +238,8 @@ def log_api_call(
     api: str,
     method: str,
     url: str,
-    status_code: Optional[int] = None,
-    duration_ms: Optional[float] = None,
+    status_code: int | None = None,
+    duration_ms: float | None = None,
 ) -> None:
     """Log API calls."""
     api_data = {"api": api, "method": method, "url": url, "type": "api_call"}
@@ -193,12 +253,12 @@ def log_api_call(
 
 
 def log_error_with_context(
-    logger: logging.Logger, error: Exception, context: Optional[dict] = None
+    logger: logging.Logger, error: Exception, context: dict | None = None
 ) -> None:
     """Log error with additional context."""
     error_data = {
         "error_type": type(error).__name__,
-        "error_message": str(error),
+        "error_message": sanitize_error_message(str(error)),
         "type": "error_context",
     }
 

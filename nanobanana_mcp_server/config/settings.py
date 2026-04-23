@@ -10,6 +10,14 @@ from ..core.exceptions import ADCConfigurationError
 from .constants import AUTH_ERROR_MESSAGES
 
 
+def _mask_error_details_from_env(transport: str) -> bool:
+    """Parse FASTMCP_MASK_ERRORS; default True for http transport if unset."""
+    raw = os.getenv("FASTMCP_MASK_ERRORS")
+    if raw is None or raw.strip() == "":
+        return transport.lower() == "http"
+    return raw.strip().lower() in ("true", "1", "yes", "on")
+
+
 def validate_gemini_base_url(raw_url: str) -> str:
     """
     Validate GEMINI_BASE_URL to mitigate SSRF / API key theft from misconfigured env.
@@ -143,16 +151,17 @@ class ServerConfig:
         if gemini_base_url:
             gemini_base_url = validate_gemini_base_url(gemini_base_url)
 
+        transport = os.getenv("FASTMCP_TRANSPORT", "stdio")
         return cls(
             gemini_api_key=api_key,
             auth_method=auth_method,
             gcp_project_id=gcp_project,
             gcp_region=gcp_region,
             gemini_base_url=gemini_base_url,
-            transport=os.getenv("FASTMCP_TRANSPORT", "stdio"),
+            transport=transport,
             host=os.getenv("FASTMCP_HOST", "127.0.0.1"),
             port=int(os.getenv("FASTMCP_PORT", "9000")),
-            mask_error_details=os.getenv("FASTMCP_MASK_ERRORS", "false").lower() == "true",
+            mask_error_details=_mask_error_details_from_env(transport),
             image_output_dir=str(output_path),
             return_full_image=os.getenv("RETURN_FULL_IMAGE", "false").strip().lower()
             in ("true", "1", "yes"),

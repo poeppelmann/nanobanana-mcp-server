@@ -371,9 +371,9 @@ class ProImageService:
             # Validate image mime type when available
             source_mime_type = mime_type
             if file_data_part:
-                source_mime_type = (
-                    (file_data_part.get("file_data") or {}).get("mime_type") or source_mime_type
-                )
+                source_mime_type = (file_data_part.get("file_data") or {}).get(
+                    "mime_type"
+                ) or source_mime_type
             validate_image_format(source_mime_type)
 
             progress.update(20, "Preparing edit request...")
@@ -425,9 +425,7 @@ class ProImageService:
                         thinking_level.value if self.config.supports_thinking else None
                     ),
                     "media_resolution": (
-                        media_resolution.value
-                        if self.config.supports_media_resolution
-                        else None
+                        media_resolution.value if self.config.supports_media_resolution else None
                     ),
                     "source_mime_type": source_mime_type,
                     "result_mime_type": f"image/{self.config.default_image_format}",
@@ -438,9 +436,7 @@ class ProImageService:
                 if output_path:
                     timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
                     image_hash = hashlib.md5(image_bytes, usedforsecurity=False).hexdigest()[:8]
-                    default_filename = (
-                        f"edit_{self._tier_label}_{timestamp}_{edit_index}_{image_hash}.{self.config.default_image_format}"
-                    )
+                    default_filename = f"edit_{self._tier_label}_{timestamp}_{edit_index}_{image_hash}.{self.config.default_image_format}"
 
                     full_path = resolve_output_path(
                         output_path=output_path,

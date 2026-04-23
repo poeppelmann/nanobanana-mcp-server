@@ -25,78 +25,100 @@ class TestServerConfigReturnFullImage:
 
     def test_default_is_false(self):
         """return_full_image defaults to false when env var is not set."""
-        with patch("nanobanana_mcp_server.config.settings.load_dotenv"), patch.dict(
-            os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True
+        with (
+            patch("nanobanana_mcp_server.config.settings.load_dotenv"),
+            patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True),
         ):
             config = ServerConfig.from_env()
             assert config.return_full_image is False
 
     def test_env_var_true(self):
         """return_full_image is true when RETURN_FULL_IMAGE=true."""
-        with patch("nanobanana_mcp_server.config.settings.load_dotenv"), patch.dict(
-            os.environ,
-            {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": "true"},
-            clear=True,
+        with (
+            patch("nanobanana_mcp_server.config.settings.load_dotenv"),
+            patch.dict(
+                os.environ,
+                {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": "true"},
+                clear=True,
+            ),
         ):
             config = ServerConfig.from_env()
             assert config.return_full_image is True
 
     def test_env_var_false(self):
         """return_full_image is false when RETURN_FULL_IMAGE=false."""
-        with patch("nanobanana_mcp_server.config.settings.load_dotenv"), patch.dict(
-            os.environ,
-            {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": "false"},
-            clear=True,
+        with (
+            patch("nanobanana_mcp_server.config.settings.load_dotenv"),
+            patch.dict(
+                os.environ,
+                {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": "false"},
+                clear=True,
+            ),
         ):
             config = ServerConfig.from_env()
             assert config.return_full_image is False
 
     def test_env_var_1(self):
         """return_full_image is true when RETURN_FULL_IMAGE=1."""
-        with patch("nanobanana_mcp_server.config.settings.load_dotenv"), patch.dict(
-            os.environ,
-            {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": "1"},
-            clear=True,
+        with (
+            patch("nanobanana_mcp_server.config.settings.load_dotenv"),
+            patch.dict(
+                os.environ,
+                {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": "1"},
+                clear=True,
+            ),
         ):
             config = ServerConfig.from_env()
             assert config.return_full_image is True
 
     def test_env_var_yes(self):
         """return_full_image is true when RETURN_FULL_IMAGE=yes."""
-        with patch("nanobanana_mcp_server.config.settings.load_dotenv"), patch.dict(
-            os.environ,
-            {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": "yes"},
-            clear=True,
+        with (
+            patch("nanobanana_mcp_server.config.settings.load_dotenv"),
+            patch.dict(
+                os.environ,
+                {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": "yes"},
+                clear=True,
+            ),
         ):
             config = ServerConfig.from_env()
             assert config.return_full_image is True
 
     def test_env_var_invalid(self):
         """return_full_image is false for unrecognized values."""
-        with patch("nanobanana_mcp_server.config.settings.load_dotenv"), patch.dict(
-            os.environ,
-            {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": "maybe"},
-            clear=True,
+        with (
+            patch("nanobanana_mcp_server.config.settings.load_dotenv"),
+            patch.dict(
+                os.environ,
+                {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": "maybe"},
+                clear=True,
+            ),
         ):
             config = ServerConfig.from_env()
             assert config.return_full_image is False
 
     def test_env_var_case_insensitive(self):
         """return_full_image parsing is case-insensitive."""
-        with patch("nanobanana_mcp_server.config.settings.load_dotenv"), patch.dict(
-            os.environ,
-            {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": "TRUE"},
-            clear=True,
+        with (
+            patch("nanobanana_mcp_server.config.settings.load_dotenv"),
+            patch.dict(
+                os.environ,
+                {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": "TRUE"},
+                clear=True,
+            ),
         ):
             config = ServerConfig.from_env()
             assert config.return_full_image is True
 
     def test_env_var_with_whitespace(self):
         """return_full_image handles whitespace in env var value."""
-        with patch("nanobanana_mcp_server.config.settings.load_dotenv"), patch.dict(
-            os.environ,
-            {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": " true "},
-            clear=True,
+        with (
+            patch("nanobanana_mcp_server.config.settings.load_dotenv"),
+            patch.dict(
+                os.environ,
+                {"GEMINI_API_KEY": "test-key", "RETURN_FULL_IMAGE": " true "},
+                clear=True,
+            ),
         ):
             config = ServerConfig.from_env()
             assert config.return_full_image is True
@@ -181,9 +203,10 @@ class TestReturnFullImagePriority:
             effective = None
             if effective is None:
                 # Simulate RuntimeError from get_server_config
-                effective = (
-                    os.getenv("RETURN_FULL_IMAGE", "false").strip().lower()
-                    in ("true", "1", "yes")
+                effective = os.getenv("RETURN_FULL_IMAGE", "false").strip().lower() in (
+                    "true",
+                    "1",
+                    "yes",
                 )
             assert effective is True
 
@@ -192,9 +215,10 @@ class TestReturnFullImagePriority:
         with patch.dict(os.environ, {}, clear=True):
             effective = None
             if effective is None:
-                effective = (
-                    os.getenv("RETURN_FULL_IMAGE", "false").strip().lower()
-                    in ("true", "1", "yes")
+                effective = os.getenv("RETURN_FULL_IMAGE", "false").strip().lower() in (
+                    "true",
+                    "1",
+                    "yes",
                 )
             assert effective is False
 
