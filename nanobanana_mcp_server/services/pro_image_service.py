@@ -11,6 +11,7 @@ from typing import Any
 from fastmcp.utilities.types import Image as MCPImage
 from PIL import Image as PILImage
 
+from ..config.constants import TEMP_FILE_SUFFIX
 from ..config.settings import MediaResolution, ProImageConfig, ThinkingLevel
 from ..core.exceptions import ImageProcessingError
 from ..core.progress_tracker import ProgressContext
@@ -18,6 +19,22 @@ from ..utils.image_utils import create_thumbnail, validate_image_format
 from ..utils.validation_utils import resolve_output_path, validate_aspect_ratio_string
 from .gemini_client import GeminiClient
 from .image_storage_service import ImageStorageService
+
+
+def _atomic_write_bytes(full_path: str, data: bytes) -> None:
+    """Write bytes to full_path via a temp file and atomic replace."""
+    temp_path = f"{full_path}{TEMP_FILE_SUFFIX}"
+    try:
+        with open(temp_path, "wb") as f:
+            f.write(data)
+        os.replace(temp_path, full_path)
+    except Exception:
+        if os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+        raise
 
 
 class ProImageService:
@@ -211,9 +228,8 @@ class ProImageService:
                             # Ensure output directory exists
                             os.makedirs(os.path.dirname(full_path) or ".", exist_ok=True)
 
-                            # Write image file
-                            with open(full_path, "wb") as f:
-                                f.write(image_bytes)
+                            # Write image file (atomic)
+                            _atomic_write_bytes(full_path, image_bytes)
 
                             # Get image dimensions
                             with PILImage.open(BytesIO(image_bytes)) as img:
@@ -355,9 +371,9 @@ class ProImageService:
             # Validate image mime type when available
             source_mime_type = mime_type
             if file_data_part:
-                source_mime_type = (
-                    (file_data_part.get("file_data") or {}).get("mime_type") or source_mime_type
-                )
+                source_mime_type = (file_data_part.get("file_data") or {}).get(
+                    "mime_type"
+                ) or source_mime_type
             validate_image_format(source_mime_type)
 
             progress.update(20, "Preparing edit request...")
@@ -409,9 +425,7 @@ class ProImageService:
                         thinking_level.value if self.config.supports_thinking else None
                     ),
                     "media_resolution": (
-                        media_resolution.value
-                        if self.config.supports_media_resolution
-                        else None
+                        media_resolution.value if self.config.supports_media_resolution else None
                     ),
                     "source_mime_type": source_mime_type,
                     "result_mime_type": f"image/{self.config.default_image_format}",
@@ -422,9 +436,7 @@ class ProImageService:
                 if output_path:
                     timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
                     image_hash = hashlib.md5(image_bytes, usedforsecurity=False).hexdigest()[:8]
-                    default_filename = (
-                        f"edit_{self._tier_label}_{timestamp}_{edit_index}_{image_hash}.{self.config.default_image_format}"
-                    )
+                    default_filename = f"edit_{self._tier_label}_{timestamp}_{edit_index}_{image_hash}.{self.config.default_image_format}"
 
                     full_path = resolve_output_path(
                         output_path=output_path,
@@ -434,8 +446,7 @@ class ProImageService:
                     )
 
                     os.makedirs(os.path.dirname(full_path) or ".", exist_ok=True)
-                    with open(full_path, "wb") as f:
-                        f.write(image_bytes)
+                    _atomic_write_bytes(full_path, image_bytes)
 
                     with PILImage.open(BytesIO(image_bytes)) as img:
                         width, height = img.size

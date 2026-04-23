@@ -4,6 +4,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from google import genai
+from google.auth import exceptions as google_auth_exceptions
 from google.genai import types as gx
 
 from ..config.settings import (
@@ -14,8 +15,10 @@ from ..config.settings import (
     NanoBanana2Config,
     ProImageConfig,
     ServerConfig,
+    validate_gemini_base_url,
 )
 from ..core.exceptions import AuthenticationError
+from ..utils.logging_utils import sanitize_error_message
 
 
 class GeminiClient:
@@ -38,28 +41,35 @@ class GeminiClient:
             # Build http_options for custom base URL if configured
             http_options = None
             if self.config.gemini_base_url:
-                http_options = {"base_url": self.config.gemini_base_url}
-                safe_url = self._get_safe_base_url_for_log(self.config.gemini_base_url)
+                validated_base = validate_gemini_base_url(self.config.gemini_base_url)
+                http_options = {"base_url": validated_base}
+                safe_url = self._get_safe_base_url_for_log(validated_base)
                 self.logger.info(f"Using custom base URL: {safe_url}")
 
-            if self.config.auth_method == AuthMethod.API_KEY:
-                if not self.config.gemini_api_key:
-                    raise AuthenticationError("API key is required for API_KEY auth method")
-                client_kwargs = {"api_key": self.config.gemini_api_key}
-                if http_options:
-                    client_kwargs["http_options"] = http_options
-                self._client = genai.Client(**client_kwargs)
-                self._log_auth_method("API Key (Developer API)")
-            else:  # VERTEX_AI
-                client_kwargs = {
-                    "vertexai": True,
-                    "project": self.config.gcp_project_id,
-                    "location": self.config.gcp_region,
-                }
-                if http_options:
-                    client_kwargs["http_options"] = http_options
-                self._client = genai.Client(**client_kwargs)
-                self._log_auth_method(f"ADC (Vertex AI - {self.config.gcp_region})")
+            try:
+                if self.config.auth_method == AuthMethod.API_KEY:
+                    if not self.config.gemini_api_key:
+                        raise AuthenticationError("API key is required for API_KEY auth method")
+                    client_kwargs = {"api_key": self.config.gemini_api_key}
+                    if http_options:
+                        client_kwargs["http_options"] = http_options
+                    self._client = genai.Client(**client_kwargs)
+                    self._log_auth_method("API Key (Developer API)")
+                else:  # VERTEX_AI
+                    client_kwargs = {
+                        "vertexai": True,
+                        "project": self.config.gcp_project_id,
+                        "location": self.config.gcp_region,
+                    }
+                    if http_options:
+                        client_kwargs["http_options"] = http_options
+                    self._client = genai.Client(**client_kwargs)
+                    self._log_auth_method(f"ADC (Vertex AI - {self.config.gcp_region})")
+            except google_auth_exceptions.DefaultCredentialsError as e:
+                safe = sanitize_error_message(str(e))
+                raise AuthenticationError(
+                    f"Google Application Default Credentials error: {safe}"
+                ) from None
         return self._client
 
     @staticmethod

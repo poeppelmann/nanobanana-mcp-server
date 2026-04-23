@@ -196,3 +196,21 @@ def get_server_config() -> ServerConfig:
     if _server_config is None:
         raise RuntimeError("Services not initialized. Call initialize_services() first.")
     return _server_config
+
+
+def readiness_state() -> tuple[bool, list[str]]:
+    """Return (ready, reasons) using cheap in-process checks only (no network I/O).
+
+    Used by /readyz. After successful startup this should be ready; reasons cover
+    edge cases (e.g. partial init) without exposing secrets.
+    """
+    reasons: list[str] = []
+    if _server_config is None:
+        reasons.append("server_config_uninitialized")
+    if _gemini_client is None:
+        reasons.append("gemini_client_uninitialized")
+    if _file_image_service is None:
+        reasons.append("file_image_service_uninitialized")
+    if _model_selector is None:
+        reasons.append("model_selector_uninitialized")
+    return (len(reasons) == 0, reasons)

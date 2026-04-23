@@ -2,11 +2,16 @@
 Tool for getting output directory statistics.
 """
 
-from fastmcp import FastMCP, Context
+import logging
+
+from fastmcp import Context, FastMCP
 from fastmcp.tools.tool import ToolResult
 from mcp.types import TextContent
+
 from ..services import get_file_image_service
-import logging
+from ..utils.client_errors import client_safe_message
+from ..utils.concurrency_limit import limit_tool_concurrency
+from ..utils.logging_utils import sanitize_error_message
 
 
 def register_output_stats_tool(server: FastMCP):
@@ -19,6 +24,7 @@ def register_output_stats_tool(server: FastMCP):
             "readOnlyHint": True,
         }
     )
+    @limit_tool_concurrency
     def show_output_stats(
         ctx: Context = None,
     ) -> ToolResult:
@@ -34,27 +40,26 @@ def register_output_stats_tool(server: FastMCP):
             stats = file_service.get_output_stats()
 
             if "error" in stats:
+                safe_err = client_safe_message(sanitize_error_message(str(stats["error"])))
                 return ToolResult(
                     content=[
-                        TextContent(
-                            type="text", text=f"❌ Error getting output stats: {stats['error']}"
-                        )
+                        TextContent(type="text", text=f"Error getting output stats: {safe_err}")
                     ],
-                    structured_content=stats,
+                    structured_content={**stats, "error": safe_err},
                 )
 
             if stats["total_images"] == 0:
                 summary = (
-                    f"📁 **Output Directory:** `{stats['output_directory']}`\n\n"
-                    f"📊 **Stats:** No images found in output directory."
+                    f"**Output Directory:** `{stats['output_directory']}`\n\n"
+                    f"**Stats:** No images found in output directory."
                 )
             else:
                 summary = (
-                    f"📁 **Output Directory:** `{stats['output_directory']}`\n\n"
-                    f"📊 **Stats:**\n"
+                    f"**Output Directory:** `{stats['output_directory']}`\n\n"
+                    f"**Stats:**\n"
                     f"- Total images: {stats['total_images']}\n"
                     f"- Total size: {stats['total_size_mb']} MB\n\n"
-                    f"🕒 **Recent Images:**\n"
+                    f"**Recent Images:**\n"
                 )
 
                 for filename in stats.get("recent_images", []):
@@ -65,5 +70,5 @@ def register_output_stats_tool(server: FastMCP):
             )
 
         except Exception as e:
-            logger.error(f"Failed to get output stats: {e}")
+            logger.error("Failed to get output stats: %s", sanitize_error_message(str(e)))
             raise
